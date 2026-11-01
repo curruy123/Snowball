@@ -25,7 +25,7 @@ except ImportError:
 RIOT_API_KEY = os.environ.get("RIOT_API_KEY", "")   # set in .env (see .env.example)
 SUMMONER     = os.environ.get("SUMMONER", "")   # Name#TAG  e.g. KYLEAKALI#KR2
 REGION       = os.environ.get("REGION",   "NA")     # KR, NA, EUW, etc.
-GAME_COUNT   = 200         # how many games to fetch
+GAME_COUNT   = int(os.environ.get("GAME_COUNT", 300))   # how many recent ranked games to scan (only Akali games are kept)
 AKALI_ID     = 84
 GUNBLADE_ID  = 3146
 

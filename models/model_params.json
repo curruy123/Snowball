@@ -1,6 +1,13 @@
 {
   "features": [
-    "cs_lead_15"
+    "gold_lead_15",
+    "xp_lead_15",
+    "cs_lead_15",
+    "kills_15",
+    "deaths_15",
+    "assists_15",
+    "em_kills_15",
+    "em_deaths_15"
   ],
   "labels": {
     "gold_lead_15": "Gold Lead vs Mid",
@@ -13,72 +20,169 @@
     "em_deaths_15": "Enemy Mid Deaths"
   },
   "means": [
-    9.452830188679245
+    287.4549180327869,
+    954.0245901639345,
+    8.102459016393443,
+    2.790983606557377,
+    1.1270491803278688,
+    1.0573770491803278,
+    1.848360655737705,
+    2.2418032786885247
   ],
   "stds": [
-    20.913929068851463
+    1094.770704535246,
+    1061.00570495766,
+    21.171861015774475,
+    1.8602178657157267,
+    1.1363254617222767,
+    1.1997211447028153,
+    1.6137083657215048,
+    1.5794967119117624
   ],
   "coefs": [
-    0.36370968566311385
+    0.11730674964469193,
+    0.4763258343760104,
+    -0.14084797050703773,
+    0.005063547604604318,
+    -0.04217541435555702,
+    -0.05535149992410804,
+    -0.053188814430184826,
+    0.019615744950028886
   ],
-  "intercept": 0.004920473568851811,
-  "base_rate": 0.5408805031446541,
-  "n_games": 159,
-  "n_train": 128,
-  "n_test": 31,
+  "intercept": 0.011510723294281147,
+  "base_rate": 0.5409836065573771,
+  "n_games": 244,
+  "n_train": 196,
+  "n_test": 48,
   "std_coefs": [
-    7.606598567612624
+    0.11730674964469193,
+    0.4763258343760104,
+    -0.14084797050703773,
+    0.005063547604604318,
+    -0.04217541435555702,
+    -0.05535149992410804,
+    -0.053188814430184826,
+    0.019615744950028886
   ],
   "calibration": [
     {
       "bin_mid": 0.3,
-      "pred_mean": 0.354,
-      "actual_wr": 0.667,
+      "pred_mean": 0.362,
+      "actual_wr": 0.167,
       "n": 6
     },
     {
       "bin_mid": 0.5,
-      "pred_mean": 0.513,
-      "actual_wr": 0.467,
-      "n": 15
+      "pred_mean": 0.501,
+      "actual_wr": 0.655,
+      "n": 29
     },
     {
       "bin_mid": 0.7,
-      "pred_mean": 0.662,
-      "actual_wr": 0.5,
-      "n": 8
+      "pred_mean": 0.685,
+      "actual_wr": 0.583,
+      "n": 12
     }
   ],
   "metrics": {
     "baseline": {
       "name": "Baseline (constant train WR)",
-      "n": 31,
-      "log_loss": 0.6945,
-      "base_log_loss": 0.6945,
+      "n": 48,
+      "log_loss": 0.6868,
+      "base_log_loss": 0.6868,
       "ll_improvement": 0.0,
-      "brier_score": 0.2507,
-      "accuracy": 0.5161,
+      "brier_score": 0.2468,
+      "accuracy": 0.5625,
       "roc_auc": 0.5
     },
     "gold_only": {
-      "name": "CS-only LR",
-      "n": 31,
-      "log_loss": 0.7507,
-      "base_log_loss": 0.6945,
-      "ll_improvement": -0.0562,
-      "brier_score": 0.277,
-      "accuracy": 0.3548,
-      "roc_auc": 0.4396
+      "name": "Gold-lead-only LR",
+      "n": 48,
+      "log_loss": 0.688,
+      "base_log_loss": 0.6868,
+      "ll_improvement": -0.0012,
+      "brier_score": 0.2471,
+      "accuracy": 0.5833,
+      "roc_auc": 0.5732
     },
     "full": {
       "name": "Full LR (all features)",
-      "n": 31,
-      "log_loss": 0.7507,
-      "base_log_loss": 0.6945,
-      "ll_improvement": -0.0562,
-      "brier_score": 0.277,
-      "accuracy": 0.3548,
-      "roc_auc": 0.4396
+      "n": 48,
+      "log_loss": 0.6865,
+      "base_log_loss": 0.6868,
+      "ll_improvement": 0.0003,
+      "brier_score": 0.2434,
+      "accuracy": 0.6042,
+      "roc_auc": 0.6014
+    },
+    "random_forest": {
+      "name": "Random forest",
+      "n": 48,
+      "log_loss": 0.6727,
+      "base_log_loss": 0.6868,
+      "ll_improvement": 0.014,
+      "brier_score": 0.24,
+      "accuracy": 0.5833,
+      "roc_auc": 0.5608
     }
-  }
+  },
+  "cv_auc": {
+    "gold_only": {
+      "mean": 0.5835,
+      "std": 0.0715,
+      "folds": 5
+    },
+    "full": {
+      "mean": 0.5632,
+      "std": 0.0525,
+      "folds": 5
+    },
+    "random_forest": {
+      "mean": 0.5852,
+      "std": 0.0502,
+      "folds": 5
+    }
+  },
+  "rf_feature_importance": [
+    {
+      "feature": "xp_lead_15",
+      "label": "XP Lead vs Mid",
+      "importance": 0.3114
+    },
+    {
+      "feature": "cs_lead_15",
+      "label": "CS Lead vs Mid",
+      "importance": 0.1819
+    },
+    {
+      "feature": "gold_lead_15",
+      "label": "Gold Lead vs Mid",
+      "importance": 0.1742
+    },
+    {
+      "feature": "kills_15",
+      "label": "My Kills",
+      "importance": 0.0971
+    },
+    {
+      "feature": "em_kills_15",
+      "label": "Enemy Mid Kills",
+      "importance": 0.0747
+    },
+    {
+      "feature": "assists_15",
+      "label": "My Assists",
+      "importance": 0.055
+    },
+    {
+      "feature": "em_deaths_15",
+      "label": "Enemy Mid Deaths",
+      "importance": 0.0536
+    },
+    {
+      "feature": "deaths_15",
+      "label": "My Deaths",
+      "importance": 0.0521
+    }
+  ]
 }

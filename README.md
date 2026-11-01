@@ -6,15 +6,28 @@ Snowball is a Python pipeline and dashboard that pulls my ranked Akali games fro
 
 👉 **[View the live dashboard](https://curruy123.github.io/finalportf/convert/)**
 
+![Snowball dashboard](docs/preview.png)
+
+## Key finding
+
+When I was 500g+ ahead at 15 minutes, I won **89%** of games where I never died while ahead, but only **42%** of games where I died twice or more while ahead. Getting ahead matters; staying alive while ahead matters more.
+
+## Features
+
+- **Review This Moment:** automatically finds the costliest death or lead swing in my most recent game and gives a replay window to jump to.
+- **Lead trends:** gold and XP lead over the enemy mid laner, split by wins and losses.
+- **Lead conversion:** win rate when ahead, even or behind at 10, 15 and 20 minutes.
+- **Deaths while ahead:** when they happen and what they cost.
+
 ---
 
 ## What it does
 
 1. **`pipeline.py`** pulls match and timeline data from the Riot API and builds features like gold, XP and CS leads at each minute.
-2. **`model.py`** trains a logistic regression win-probability model on the game state at 15 minutes and compares it to a baseline.
+2. **`model.py`** predicts wins from the game state at 15 minutes (gold, XP and CS leads, kills, deaths, assists). It compares a baseline, two logistic regressions and a random forest, using a time-ordered test set and time-series cross-validation, and ranks which stats matter most.
 3. **`dashboard.py`** turns the results into a single interactive HTML dashboard (Chart.js).
 
-The pipeline can pull as many games as you want. The latest run used 162 games.
+The pipeline can scan as many recent ranked games as you want. Set `GAME_COUNT` in `.env` (default 300).
 
 ## What the dashboard shows
 

@@ -1,6 +1,8 @@
 """
 Snowball — Win Probability Model
-Trains a logistic regression on 15-minute game state to predict win probability.
+Predicts win probability from the game state at 15 minutes.
+Compares a baseline, two logistic regressions and a random forest,
+using a time-ordered train/test split plus time-series cross-validation.
 
 Run AFTER pipeline.py:
     python3 model.py
@@ -16,6 +18,8 @@ import math
 import joblib
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import TimeSeriesSplit
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import (
@@ -27,7 +31,14 @@ os.makedirs("models", exist_ok=True)
 # ── Feature definition ────────────────────────────────────────────────────────
 # Order matters — must be consistent between training and inference
 FEATURES = [
+    "gold_lead_15",
+    "xp_lead_15",
     "cs_lead_15",
+    "kills_15",
+    "deaths_15",
+    "assists_15",
+    "em_kills_15",
+    "em_deaths_15",
 ]
 
 FEATURE_LABELS = {
@@ -88,6 +99,48 @@ def evaluate(name, y_true, y_pred_proba, y_pred_class, base_rate):
     }
 
 
+class _ColumnModel:
+    """Fits a model on a subset of columns (used to cross-validate the gold-only model)."""
+    def __init__(self, model, cols):
+        self.model, self.cols = model, cols
+    def fit(self, X, y):
+        self.model.fit(X[:, self.cols], y); return self
+    def predict_proba(self, X):
+        return self.model.predict_proba(X[:, self.cols])
+
+
+def make_lr():
+    return Pipeline([
+        ("scaler", StandardScaler()),
+        ("lr", LogisticRegression(C=1.0, max_iter=1000, class_weight="balanced")),
+    ])
+
+
+def make_rf():
+    # Shallow trees + a minimum leaf size keep the forest from memorizing a small dataset
+    return RandomForestClassifier(
+        n_estimators=400, max_depth=4, min_samples_leaf=5,
+        class_weight="balanced", random_state=42, n_jobs=-1,
+    )
+
+
+def time_series_cv_auc(make_model, X, y, n_splits=5):
+    """
+    Average AUC across expanding time-ordered folds (always train on older games,
+    test on newer ones). More stable than a single split when data is small.
+    """
+    scores = []
+    for tr, te in TimeSeriesSplit(n_splits=n_splits).split(X):
+        if len(set(y[te])) < 2 or len(set(y[tr])) < 2:
+            continue
+        m = make_model()
+        m.fit(X[tr], y[tr])
+        scores.append(roc_auc_score(y[te], m.predict_proba(X[te])[:, 1]))
+    if not scores:
+        return None
+    return {"mean": round(float(np.mean(scores)), 4), "std": round(float(np.std(scores)), 4), "folds": len(scores)}
+
+
 def chronological_split(X, y, test_frac=0.2):
     """
     Hold out the most recent test_frac of games as the test set.
@@ -124,33 +177,44 @@ def train_and_evaluate(rows):
         "Baseline (constant train WR)", y_te, base_proba_te, base_class_te, train_base
     )
 
-    # ── Model B: CS-only logistic regression ─────────────────────────────────
-    cs_idx = FEATURES.index("cs_lead_15")
-    pipe_gold = Pipeline([
-        ("scaler", StandardScaler()),
-        ("lr", LogisticRegression(C=1.0, max_iter=1000, class_weight="balanced")),
-    ])
-    pipe_gold.fit(X_tr[:, [cs_idx]], y_tr)
-    gp_te = pipe_gold.predict_proba(X_te[:, [cs_idx]])[:, 1]
-    gc_te = pipe_gold.predict(X_te[:, [cs_idx]])
-    metrics_gold = evaluate("CS-only LR", y_te, gp_te, gc_te, train_base)
+    # ── Model B: gold-lead-only logistic regression ──────────────────────────
+    g_idx = FEATURES.index("gold_lead_15")
+    pipe_gold = make_lr()
+    pipe_gold.fit(X_tr[:, [g_idx]], y_tr)
+    gp_te = pipe_gold.predict_proba(X_te[:, [g_idx]])[:, 1]
+    gc_te = pipe_gold.predict(X_te[:, [g_idx]])
+    metrics_gold = evaluate("Gold-lead-only LR", y_te, gp_te, gc_te, train_base)
 
-    # ── Model C: full logistic regression ────────────────────────────────────
-    pipe_full = Pipeline([
-        ("scaler", StandardScaler()),
-        ("lr", LogisticRegression(C=1.0, max_iter=1000, class_weight="balanced")),
-    ])
+    # ── Model C: full logistic regression (all features) ─────────────────────
+    pipe_full = make_lr()
     pipe_full.fit(X_tr, y_tr)
     fp_te = pipe_full.predict_proba(X_te)[:, 1]
     fc_te = pipe_full.predict(X_te)
     metrics_full = evaluate("Full LR (all features)", y_te, fp_te, fc_te, train_base)
 
-    # ── Re-fit full model on ALL data for deployment ─────────────────────────
-    pipe_deploy = Pipeline([
-        ("scaler", StandardScaler()),
-        ("lr", LogisticRegression(C=1.0, max_iter=1000, class_weight="balanced")),
-    ])
+    # ── Model D: random forest (all features) ────────────────────────────────
+    rf = make_rf()
+    rf.fit(X_tr, y_tr)
+    rp_te = rf.predict_proba(X_te)[:, 1]
+    rc_te = rf.predict(X_te)
+    metrics_rf = evaluate("Random forest", y_te, rp_te, rc_te, train_base)
+
+    # ── Time-series cross-validation (more reliable on small data) ───────────
+    cv = {
+        "gold_only":     time_series_cv_auc(lambda: _ColumnModel(make_lr(), [g_idx]), X, y),
+        "full":          time_series_cv_auc(make_lr, X, y),
+        "random_forest": time_series_cv_auc(make_rf, X, y),
+    }
+
+    # ── Re-fit models on ALL data for deployment ─────────────────────────────
+    pipe_deploy = make_lr()
     pipe_deploy.fit(X, y)
+    rf_deploy = make_rf()
+    rf_deploy.fit(X, y)
+    rf_importance = sorted(
+        zip(FEATURES, rf_deploy.feature_importances_.tolist()),
+        key=lambda t: t[1], reverse=True,
+    )
 
     # ── Coefficients ──────────────────────────────────────────────────────────
     scaler = pipe_deploy.named_steps["scaler"]
@@ -159,8 +223,11 @@ def train_and_evaluate(rows):
     stds   = scaler.scale_.tolist()
     means  = scaler.mean_.tolist()
 
-    # Standardized coefficients = coef * std  (effect of 1-std-unit change on log-odds)
-    std_coefs = [c * s for c, s in zip(coefs, stds)]
+    # The pipeline standardizes inputs first, so lr.coef_ is already the effect of a
+    # 1-standard-deviation change on the log-odds of winning (comparable across features).
+    std_coefs = list(coefs)
+    # Effect of a 1-unit change (e.g. +1 gold, +1 kill) in the original units
+    unit_coefs = [c / s for c, s in zip(coefs, stds)]
 
     # ── Calibration (test set, binned) ────────────────────────────────────────
     calibration = None
@@ -182,17 +249,28 @@ def train_and_evaluate(rows):
     print("\nEVALUATION RESULTS (test set — most recent 20% of games)")
     print(f"{'Model':<30} {'LogLoss':>8} {'Brier':>7} {'AUC':>7} {'Acc':>7}")
     print("-" * 62)
-    for m in [metrics_base, metrics_gold, metrics_full]:
+    for m in [metrics_base, metrics_gold, metrics_full, metrics_rf]:
         auc_str = f"{m['roc_auc']:.4f}" if m["roc_auc"] is not None else "  n/a "
         print(f"{m['name']:<30} {m['log_loss']:>8.4f} {m['brier_score']:>7.4f} "
               f"{auc_str:>7} {m['accuracy']:>7.4f}")
 
+    print("\nTIME-SERIES CROSS-VALIDATION (mean AUC across folds, 0.50 = coin flip)")
+    for key, label in [("gold_only", "Gold-lead-only LR"), ("full", "Full LR"), ("random_forest", "Random forest")]:
+        c = cv[key]
+        print(f"  {label:<28} {c['mean']:.4f} ± {c['std']:.4f}  ({c['folds']} folds)" if c else f"  {label:<28} n/a")
+
+    print("\nRANDOM FOREST FEATURE IMPORTANCE")
+    for feat, imp in rf_importance:
+        print(f"  {FEATURE_LABELS[feat]:<20} {imp:>6.3f}  {'█' * int(round(imp * 40))}")
+
     print("\nCOEFFICIENTS (full model, trained on all data)")
-    print(f"  {'Feature':<20} {'Raw coef':>10} {'Std coef':>10}  Interpretation")
+    print(f"  {'Feature':<20} {'Per 1 SD':>10} {'Per unit':>12}  Direction")
     print("  " + "-" * 70)
-    for feat, raw, std_c in zip(FEATURES, coefs, std_coefs):
+    for feat, std_c, unit_c in zip(FEATURES, std_coefs, unit_coefs):
         direction = "↑ win" if std_c > 0 else "↓ win"
-        print(f"  {FEATURE_LABELS[feat]:<20} {raw:>10.4f} {std_c:>10.4f}  {direction}")
+        print(f"  {FEATURE_LABELS[feat]:<20} {std_c:>10.4f} {unit_c:>12.6f}  {direction}")
+    print("  (Gold, XP and CS leads move together, so their individual signs can flip;")
+    print("   read them as a group, and use the random forest importance for ranking.)")
     print(f"  {'Intercept':<20} {lr.intercept_[0]:>10.4f}")
 
     return {
@@ -200,6 +278,10 @@ def train_and_evaluate(rows):
         "metrics_base":  metrics_base,
         "metrics_gold":  metrics_gold,
         "metrics_full":  metrics_full,
+        "metrics_rf":    metrics_rf,
+        "cv_auc":        cv,
+        "rf_deploy":     rf_deploy,
+        "rf_importance": rf_importance,
         "coefs":         coefs,
         "std_coefs":     std_coefs,
         "means":         means,
@@ -239,7 +321,13 @@ def export_browser_params(result, path="models/model_params.json"):
             "baseline": result["metrics_base"],
             "gold_only": result["metrics_gold"],
             "full": result["metrics_full"],
+            "random_forest": result["metrics_rf"],
         },
+        "cv_auc": result["cv_auc"],
+        "rf_feature_importance": [
+            {"feature": f, "label": FEATURE_LABELS[f], "importance": round(i, 4)}
+            for f, i in result["rf_importance"]
+        ],
     }
     with open(path, "w") as f:
         json.dump(params, f, indent=2)
@@ -297,7 +385,8 @@ def main():
 
     # Save sklearn pipeline
     joblib.dump(result["pipe_deploy"], "models/win_probability.joblib")
-    print("\nModel saved → models/win_probability.joblib")
+    joblib.dump(result["rf_deploy"], "models/random_forest.joblib")
+    print("\nModels saved → models/win_probability.joblib, models/random_forest.joblib")
 
     # Export browser params
     export_browser_params(result)
