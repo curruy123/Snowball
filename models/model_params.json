@@ -1,0 +1,84 @@
+{
+  "features": [
+    "cs_lead_15"
+  ],
+  "labels": {
+    "gold_lead_15": "Gold Lead vs Mid",
+    "xp_lead_15": "XP Lead vs Mid",
+    "cs_lead_15": "CS Lead vs Mid",
+    "kills_15": "My Kills",
+    "deaths_15": "My Deaths",
+    "assists_15": "My Assists",
+    "em_kills_15": "Enemy Mid Kills",
+    "em_deaths_15": "Enemy Mid Deaths"
+  },
+  "means": [
+    9.452830188679245
+  ],
+  "stds": [
+    20.913929068851463
+  ],
+  "coefs": [
+    0.36370968566311385
+  ],
+  "intercept": 0.004920473568851811,
+  "base_rate": 0.5408805031446541,
+  "n_games": 159,
+  "n_train": 128,
+  "n_test": 31,
+  "std_coefs": [
+    7.606598567612624
+  ],
+  "calibration": [
+    {
+      "bin_mid": 0.3,
+      "pred_mean": 0.354,
+      "actual_wr": 0.667,
+      "n": 6
+    },
+    {
+      "bin_mid": 0.5,
+      "pred_mean": 0.513,
+      "actual_wr": 0.467,
+      "n": 15
+    },
+    {
+      "bin_mid": 0.7,
+      "pred_mean": 0.662,
+      "actual_wr": 0.5,
+      "n": 8
+    }
+  ],
+  "metrics": {
+    "baseline": {
+      "name": "Baseline (constant train WR)",
+      "n": 31,
+      "log_loss": 0.6945,
+      "base_log_loss": 0.6945,
+      "ll_improvement": 0.0,
+      "brier_score": 0.2507,
+      "accuracy": 0.5161,
+      "roc_auc": 0.5
+    },
+    "gold_only": {
+      "name": "CS-only LR",
+      "n": 31,
+      "log_loss": 0.7507,
+      "base_log_loss": 0.6945,
+      "ll_improvement": -0.0562,
+      "brier_score": 0.277,
+      "accuracy": 0.3548,
+      "roc_auc": 0.4396
+    },
+    "full": {
+      "name": "Full LR (all features)",
+      "n": 31,
+      "log_loss": 0.7507,
+      "base_log_loss": 0.6945,
+      "ll_improvement": -0.0562,
+      "brier_score": 0.277,
+      "accuracy": 0.3548,
+      "roc_auc": 0.4396
+    }
+  }
+}
